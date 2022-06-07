@@ -4,6 +4,7 @@ dependencies:
   - python == 3.7.11
   - pip
   - numpy
+  - matplotlib
   - pip:
     - gym[atari]
     - autorom[accept-rom-license]
