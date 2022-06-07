@@ -5,6 +5,7 @@ dependencies:
   - pip
   - opencv == 3.4.2
   - numpy
+  - matplotlib
   - pip:
     - gym[atari]
     - autorom[accept-rom-license]
