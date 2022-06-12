@@ -115,15 +115,24 @@ class AtariCES():
 
         return start_weights
         
-    def get_weights(self):
+    def get_weights(self, method):
         """
         Get weights used to compute the weighted mean of
-        model parameters.
+        model parameters if selecting top n parents.
+        Else, compute uniform weights.
         """
-        W = [np.log(self.n_parents - 0.5) - np.log(i) for i in range(1, self.n_parents + 1)]
-        W /= np.sum(W)
+        if method == "topn":
+            W = [np.log(self.n_parents - 0.5) - np.log(i) for i in range(1, self.n_parents + 1)]
+            W /= np.sum(W)
 
-        return W
+            return W
+
+        elif (method == "random") or (method == "tournament"): 
+            W = [1 / self.n_parents] * self.n_parents
+            return W
+
+        else:
+            print("Invalid parent selection method")
 
     def set_model_weights(self, theta, sigma, e):
         """
@@ -179,7 +188,7 @@ class AtariCES():
         predefined Atari game.
         """
         theta = self.get_start_parameters(self.model)
-        W = self.get_weights()
+        W = self.get_weights(method=self.parent_selection)
         best_r = np.zeros((self.iterations))
 
         for t in range(self.iterations):
@@ -195,6 +204,7 @@ class AtariCES():
                 else:
                     r[i] = self.episode(new_model, self.max_step)
 
+            print(r)
             best_r[t] = np.max(r)
             print(f"best reward: {best_r[t]}")
 
