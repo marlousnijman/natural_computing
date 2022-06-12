@@ -3,6 +3,7 @@ import numpy as np
 from gym.wrappers import AtariPreprocessing, FrameStack
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import random
 
 from model import DQN
 
@@ -11,8 +12,8 @@ class AtariCES():
     def __init__(self, game, render,
                 max_step=1000, sigma=0.01,
                 n_parents=10, n_offspring=20, 
-                iterations=10,adaptive_type='constant'):
-
+                iterations=10, parent_selection="topn", 
+                adaptive_type='constant'):
         """
         Initialize the Atari Canonical Evolutionary
         Strategy class.
@@ -30,8 +31,9 @@ class AtariCES():
         self.n_parents = n_parents
         self.n_offspring = n_offspring
         self.iterations = iterations
+        self.parent_selection = parent_selection
         self.adaptive_type = adaptive_type
-
+        
     def set_model(self, model):
         self.model = model
 
@@ -115,15 +117,24 @@ class AtariCES():
 
         return start_weights
         
-    def get_weights(self):
+    def get_weights(self, method):
         """
         Get weights used to compute the weighted mean of
-        model parameters.
+        model parameters if selecting top n parents.
+        Else, compute uniform weights.
         """
-        W = [np.log(self.n_parents - 0.5) - np.log(i) for i in range(1, self.n_parents + 1)]
-        W /= np.sum(W)
+        if method == "topn":
+            W = [np.log(self.n_parents - 0.5) - np.log(i) for i in range(1, self.n_parents + 1)]
+            W /= np.sum(W)
 
-        return W
+            return W
+
+        elif (method == "random") or (method == "tournament"): 
+            W = [1 / self.n_parents] * self.n_parents
+            return W
+
+        else:
+            print("Invalid parent selection method")
 
     def set_model_weights(self, theta, sigma, e):
         """
@@ -151,6 +162,28 @@ class AtariCES():
 
         print("Finished")
 
+    def select_parents(self, e, rewards, method):
+        """ 
+        Select parents according to the method of choice.
+        Can be selecting the top n best parents, random parents,
+        or tournament selection. 
+        """
+        if method == "topn":
+            sorted_rewards = rewards.argsort()[::-1]
+            best_offspring = e[sorted_rewards][:self.n_parents]
+
+            return best_offspring
+
+        elif method == "random":
+            return random.choices(e, k=self.n_parents)
+
+        elif method == "tournament": 
+            weights = rewards / np.sum(rewards)
+            return random.choices(e, weights=weights, k=self.n_parents)
+
+        else:
+            print("Invalid parent selection method")
+
     def get_sigma(self,sigma,i,iterations,adaptive_type):
         """
         Return step size according the adaptive mutation strategy.
@@ -169,7 +202,9 @@ class AtariCES():
 
         else:
             real_sigma = sigma
+            
         return real_sigma
+
 
     def CES(self):
         """
@@ -177,7 +212,7 @@ class AtariCES():
         predefined Atari game.
         """
         theta = self.get_start_parameters(self.model)
-        W = self.get_weights()
+        W = self.get_weights(method=self.parent_selection)
         best_r = np.zeros((self.iterations))
 
         for t in range(self.iterations):
@@ -196,14 +231,12 @@ class AtariCES():
                 else:
                     r[i] = self.episode(new_model, self.max_step)
 
-            # print(r)
-            best_rs = r.argsort()[::-1]
-            print(f"reward: {r[best_rs]}")
+            print(r)
             best_r[t] = np.max(r)
             print(f"best reward: {best_r[t]}")
-            best_es = e[best_rs][:self.n_parents]
 
+
+            best_es = self.select_parents(e, r, method=self.parent_selection)
             theta += sigma_step * np.sum([W[i] * best_es[i] for i in range(len(W))], axis=0)
 
         return theta, best_r
-
