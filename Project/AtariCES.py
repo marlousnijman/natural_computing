@@ -12,6 +12,7 @@ class AtariCES():
                 max_step=1000, sigma=0.01,
                 n_parents=10, n_offspring=20, 
                 iterations=10,adaptive_type='constant'):
+
         """
         Initialize the Atari Canonical Evolutionary
         Strategy class.
@@ -23,7 +24,6 @@ class AtariCES():
         self.render = render
         self.max_step = max_step
         self.n_actions = 0
-
 
         # Evolutionary strategy parameters
         self.sigma = sigma
@@ -171,7 +171,6 @@ class AtariCES():
             real_sigma = sigma
         return real_sigma
 
-
     def CES(self):
         """
         Perform the Canonical Evolutionary Strategy on the
@@ -182,14 +181,16 @@ class AtariCES():
         best_r = np.zeros((self.iterations))
 
         for t in range(self.iterations):
-            sigma_step = self.get_sigma(self.sigma,t,self.iterations,self.adaptive_type)
             print('Iteration: ', t + 1)
             e = np.zeros((self.n_offspring, theta.shape[0]))
             r = np.zeros((self.n_offspring))
-
+            
+            sigma_step = self.get_sigma(self.sigma,t,self.iterations,self.adaptive_type)
+            
             for i in tqdm(range(self.n_offspring)):
                 e[i] = np.random.normal(0, sigma_step**2, size=theta.shape)
                 new_model = self.set_model_weights(theta, sigma_step, e[i])
+
                 if self.render:
                     r[i] = self.episode(new_model, self.max_step, render=True)
                 else:
