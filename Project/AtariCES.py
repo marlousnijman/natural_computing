@@ -11,7 +11,8 @@ class AtariCES():
     def __init__(self, game, render,
                 max_step=1000, sigma=0.01,
                 n_parents=10, n_offspring=20, 
-                iterations=10):
+                iterations=10,adaptive_type='constant'):
+
         """
         Initialize the Atari Canonical Evolutionary
         Strategy class.
@@ -29,6 +30,7 @@ class AtariCES():
         self.n_parents = n_parents
         self.n_offspring = n_offspring
         self.iterations = iterations
+        self.adaptive_type = adaptive_type
 
     def set_model(self, model):
         self.model = model
@@ -149,6 +151,26 @@ class AtariCES():
 
         print("Finished")
 
+    def get_sigma(self,sigma,i,iterations,adaptive_type):
+        """
+        Return step size according the adaptive mutation strategy.
+        """
+        if adaptive_type == 'constant':
+            real_sigma = sigma
+
+        elif adaptive_type == 'linear':
+            real_sigma = np.linspace(sigma[0],sigma[1],iterations)[i]
+
+        elif adaptive_type == 'exp':
+            real_sigma = np.flip(np.logspace(sigma[0],sigma[1],iterations))[i]
+
+        elif adaptive_type == 'log':
+            real_sigma = np.logspace(sigma[1], sigma[0], iterations)[i]
+
+        else:
+            real_sigma = sigma
+        return real_sigma
+
     def CES(self):
         """
         Perform the Canonical Evolutionary Strategy on the
@@ -162,10 +184,13 @@ class AtariCES():
             print('Iteration: ', t + 1)
             e = np.zeros((self.n_offspring, theta.shape[0]))
             r = np.zeros((self.n_offspring))
-
+            
+            sigma_step = self.get_sigma(self.sigma,t,self.iterations,self.adaptive_type)
+            
             for i in tqdm(range(self.n_offspring)):
-                e[i] = np.random.normal(0, self.sigma**2, size=theta.shape)
-                new_model = self.set_model_weights(theta, self.sigma, e[i])
+                e[i] = np.random.normal(0, sigma_step**2, size=theta.shape)
+                new_model = self.set_model_weights(theta, sigma_step, e[i])
+
                 if self.render:
                     r[i] = self.episode(new_model, self.max_step, render=True)
                 else:
@@ -178,7 +203,7 @@ class AtariCES():
             print(f"best reward: {best_r[t]}")
             best_es = e[best_rs][:self.n_parents]
 
-            theta += self.sigma * np.sum([W[i] * best_es[i] for i in range(len(W))], axis=0)
+            theta += sigma_step * np.sum([W[i] * best_es[i] for i in range(len(W))], axis=0)
 
         return theta, best_r
 
