@@ -205,6 +205,20 @@ class AtariCES():
             
         return real_sigma
 
+    def plot_rewards(self, best_r, worst_r, mean_r):
+        """
+        Plot the mean reward over iterations and an interval
+        showing the best and worst reward.
+        """
+        x = np.arange(len(best_r))
+        plt.figure()
+        plt.plot(x, mean_r)
+        plt.fill_between(x, worst_r, best_r, color="#C4E1F5")
+        plt.xticks(x)
+        plt.xlabel("Iteration")
+        plt.ylabel("Reward")
+        plt.savefig(f"rewards_{self.game}_{self.adaptive_type}.png")
+        plt.show()
 
     def CES(self):
         """
@@ -214,6 +228,8 @@ class AtariCES():
         theta = self.get_start_parameters(self.model)
         W = self.get_weights(method=self.parent_selection)
         best_r = np.zeros((self.iterations))
+        worst_r = np.zeros((self.iterations))
+        mean_r = np.zeros((self.iterations))
 
         for t in range(self.iterations):
             print('Iteration: ', t + 1)
@@ -231,12 +247,15 @@ class AtariCES():
                 else:
                     r[i] = self.episode(new_model, self.max_step)
 
-            print(r)
             best_r[t] = np.max(r)
+            worst_r[t] = np.min(r)
+            mean_r[t] = np.mean(r)
+            print(r)
             print(f"best reward: {best_r[t]}")
-
 
             best_es = self.select_parents(e, r, method=self.parent_selection)
             theta += sigma_step * np.sum([W[i] * best_es[i] for i in range(len(W))], axis=0)
+
+        self.plot_rewards(best_r, worst_r, mean_r)
 
         return theta, best_r
