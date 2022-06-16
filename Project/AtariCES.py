@@ -195,10 +195,10 @@ class AtariCES():
             real_sigma = np.linspace(sigma[0],sigma[1],iterations)[i]
 
         elif adaptive_type == 'log':
-            real_sigma = np.geompace(sigma[0],sigma[1],iterations)[i]
+            real_sigma = np.geomspace(sigma[0],sigma[1],iterations)[i]
 
         elif adaptive_type == 'exp':
-            real_sigma = np.geompace(sigma[1], sigma[0], iterations)[i]
+            real_sigma = np.geomspace(sigma[1], sigma[0], iterations)[i]
 
         else:
             real_sigma = sigma
