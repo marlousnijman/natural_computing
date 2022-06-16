@@ -31,3 +31,26 @@ def DQN(input_shape=(84, 84, 4), n_actions=4):
     model.add(layers.Activation('elu'))
 
     return model
+
+def mnih_DQN(input_shape=(84, 84, 4), n_actions=4):
+    model = models.Sequential()
+
+    # Convolutional layers
+    model.add(layers.Conv2D(8, (7, 7), strides=4, input_shape=input_shape))
+    model.add(layers.Activation('relu'))
+    model.add(layers.MaxPooling2D((2, 2), strides=2))
+
+    model.add(layers.Conv2D(16, (3, 3), strides=1))
+    model.add(layers.Activation('relu'))
+    model.add(layers.MaxPooling2D((2, 2), strides=2))
+
+    model.add(layers.Flatten())
+
+    # Output layer
+    model.add(layers.Dense(400)) 
+    model.add(layers.Activation('relu'))
+    
+    model.add(layers.Dense(n_actions)) 
+    model.add(layers.Activation('relu'))
+
+    return model

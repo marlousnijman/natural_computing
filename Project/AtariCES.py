@@ -4,7 +4,7 @@ from gym.wrappers import AtariPreprocessing, FrameStack
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from model import DQN
+from model import DQN, mnih_DQN
 
 
 class AtariCES():
@@ -16,7 +16,7 @@ class AtariCES():
         Initialize the Atari Canonical Evolutionary
         Strategy class.
         """
-        self.model = DQN()
+        self.model = mnih_DQN()
     
         # Game parameters
         self.game = game
@@ -128,7 +128,7 @@ class AtariCES():
         Set the model weights based on theta and
         possibly random noise.
         """
-        model = DQN(n_actions=self.n_actions) 
+        model = mnih_DQN(n_actions=self.n_actions) 
         parameters = model.trainable_weights
         start_idx = 0
         w = theta + sigma * e
@@ -157,6 +157,8 @@ class AtariCES():
         theta = self.get_start_parameters(self.model)
         W = self.get_weights()
         best_r = np.zeros((self.iterations))
+        worst_r = np.zeros((self.iterations))
+        average_r = np.zeros((self.iterations))
 
         for t in range(self.iterations):
             print('Iteration: ', t + 1)
@@ -176,9 +178,24 @@ class AtariCES():
             print(f"reward: {r[best_rs]}")
             best_r[t] = np.max(r)
             print(f"best reward: {best_r[t]}")
-            best_es = e[best_rs][:self.n_parents]
+            
+            average_r[t] = np.average(r)
+            print(f"average reward: {average_r[t]}")
 
+            worst_r[t] = np.min(r)
+            print(f"worst reward: {worst_r[t]}")
+
+            best_es = e[best_rs][:self.n_parents]
             theta += self.sigma * np.sum([W[i] * best_es[i] for i in range(len(W))], axis=0)
 
-        return theta, best_r
+        return theta, best_r, average_r, worst_r
 
+    def plot_rewards(self, best_r, avg_r, worst_r):
+        plt.fill_between(avg_r, best_r, worst_r, color='blue', alpha=0.5)
+        # plt.plot(best_r, label='best rewards', color='green')
+        plt.plot(avg_r, label='average rewards', color='orange')
+        # plt.plot(worst_r, label='worst rewards', color='red')
+        plt.title(f'Training curves for Canonical ES Algorithm of the game {self.game}')
+        plt.xlabel("Iterations")
+        plt.ylabel("Reward")
+        plt.show()
