@@ -3,20 +3,22 @@ import numpy as np
 from gym.wrappers import AtariPreprocessing, FrameStack
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import random
 
-from model import DQN, mnih_DQN
+from model import DQN, mnih_DQN, rodrigues_DQN
 
 
 class AtariCES():
     def __init__(self, game, render,
                 max_step=1000, sigma=0.01,
                 n_parents=10, n_offspring=20, 
-                iterations=10):
+                iterations=10, parent_selection="topn", 
+                adaptive_type='constant'):
         """
         Initialize the Atari Canonical Evolutionary
         Strategy class.
         """
-        self.model = mnih_DQN()
+        self.model = rodrigues_DQN()
     
         # Game parameters
         self.game = game
@@ -29,7 +31,9 @@ class AtariCES():
         self.n_parents = n_parents
         self.n_offspring = n_offspring
         self.iterations = iterations
-
+        self.parent_selection = parent_selection
+        self.adaptive_type = adaptive_type
+        
     def set_model(self, model):
         self.model = model
 
@@ -113,22 +117,31 @@ class AtariCES():
 
         return start_weights
         
-    def get_weights(self):
+    def get_weights(self, method):
         """
         Get weights used to compute the weighted mean of
-        model parameters.
+        model parameters if selecting top n parents.
+        Else, compute uniform weights.
         """
-        W = [np.log(self.n_parents - 0.5) - np.log(i) for i in range(1, self.n_parents + 1)]
-        W /= np.sum(W)
+        if method == "topn":
+            W = [np.log(self.n_parents - 0.5) - np.log(i) for i in range(1, self.n_parents + 1)]
+            W /= np.sum(W)
 
-        return W
+            return W
+
+        elif (method == "random") or (method == "tournament"): 
+            W = [1 / self.n_parents] * self.n_parents
+            return W
+
+        else:
+            print("Invalid parent selection method")
 
     def set_model_weights(self, theta, sigma, e):
         """
         Set the model weights based on theta and
         possibly random noise.
         """
-        model = mnih_DQN(n_actions=self.n_actions) 
+        model = rodrigues_DQN(n_actions=self.n_actions) 
         parameters = model.trainable_weights
         start_idx = 0
         w = theta + sigma * e
@@ -149,53 +162,101 @@ class AtariCES():
 
         print("Finished")
 
+    def select_parents(self, e, rewards, method):
+        """ 
+        Select parents according to the method of choice.
+        Can be selecting the top n best parents, random parents,
+        or tournament selection. 
+        """
+        if method == "topn":
+            sorted_rewards = rewards.argsort()[::-1]
+            best_offspring = e[sorted_rewards][:self.n_parents]
+
+            return best_offspring
+
+        elif method == "random":
+            return random.choices(e, k=self.n_parents)
+
+        elif method == "tournament": 
+            weights = rewards / np.sum(rewards)
+            return random.choices(e, weights=weights, k=self.n_parents)
+
+        else:
+            print("Invalid parent selection method")
+
+    def get_sigma(self,sigma,i,iterations,adaptive_type):
+        """
+        Return step size according the adaptive mutation strategy.
+        """
+        if adaptive_type == 'constant':
+            real_sigma = sigma
+
+        elif adaptive_type == 'linear':
+            real_sigma = np.linspace(sigma[0],sigma[1],iterations)[i]
+
+        elif adaptive_type == 'exp':
+            real_sigma = np.flip(np.logspace(sigma[0],sigma[1],iterations))[i]
+
+        elif adaptive_type == 'log':
+            real_sigma = np.logspace(sigma[1], sigma[0], iterations)[i]
+
+        else:
+            real_sigma = sigma
+            
+        return real_sigma
+
+    def plot_rewards(self, best_r, worst_r, mean_r):
+        """
+        Plot the mean reward over iterations and an interval
+        showing the best and worst reward.
+        """
+        x = np.arange(len(best_r))
+        plt.figure()
+        plt.plot(x, mean_r)
+        plt.fill_between(x, worst_r, best_r, color="#C4E1F5")
+        plt.xticks(x)
+        plt.xlabel("Iteration")
+        plt.ylabel("Reward")
+        plt.savefig(f"rewards_{self.game}_{self.adaptive_type}.png")
+        plt.show()
+
     def CES(self):
         """
         Perform the Canonical Evolutionary Strategy on the
         predefined Atari game.
         """
         theta = self.get_start_parameters(self.model)
-        W = self.get_weights()
+        W = self.get_weights(method=self.parent_selection)
         best_r = np.zeros((self.iterations))
         worst_r = np.zeros((self.iterations))
-        average_r = np.zeros((self.iterations))
+        mean_r = np.zeros((self.iterations))
 
         for t in range(self.iterations):
             print('Iteration: ', t + 1)
             e = np.zeros((self.n_offspring, theta.shape[0]))
             r = np.zeros((self.n_offspring))
-
+            
+            sigma_step = self.get_sigma(self.sigma,t,self.iterations,self.adaptive_type)
+            
             for i in tqdm(range(self.n_offspring)):
-                e[i] = np.random.normal(0, self.sigma**2, size=theta.shape)
-                new_model = self.set_model_weights(theta, self.sigma, e[i])
+                e[i] = np.random.normal(0, sigma_step**2, size=theta.shape)
+                new_model = self.set_model_weights(theta, sigma_step, e[i])
+
                 if self.render:
                     r[i] = self.episode(new_model, self.max_step, render=True)
                 else:
                     r[i] = self.episode(new_model, self.max_step)
 
-            # print(r)
-            best_rs = r.argsort()[::-1]
-            print(f"reward: {r[best_rs]}")
             best_r[t] = np.max(r)
-            print(f"best reward: {best_r[t]}")
-            
-            average_r[t] = np.average(r)
-            print(f"average reward: {average_r[t]}")
-
             worst_r[t] = np.min(r)
-            print(f"worst reward: {worst_r[t]}")
+            mean_r[t] = np.mean(r)
 
-            best_es = e[best_rs][:self.n_parents]
-            theta += self.sigma * np.sum([W[i] * best_es[i] for i in range(len(W))], axis=0)
+            print(f"best reward: {best_r[t]}")
 
-        return theta, best_r, average_r, worst_r
+            best_es = self.select_parents(e, r, method=self.parent_selection)
+            theta += sigma_step * np.sum([W[i] * best_es[i] for i in range(len(W))], axis=0)
 
-    def plot_rewards(self, best_r, avg_r, worst_r):
-        plt.fill_between(avg_r, best_r, worst_r, color='blue', alpha=0.5)
-        # plt.plot(best_r, label='best rewards', color='green')
-        plt.plot(avg_r, label='average rewards', color='orange')
-        # plt.plot(worst_r, label='worst rewards', color='red')
-        plt.title(f'Training curves for Canonical ES Algorithm of the game {self.game}')
-        plt.xlabel("Iterations")
-        plt.ylabel("Reward")
-        plt.show()
+        self.plot_rewards(best_r, worst_r, mean_r)
+
+        return theta, best_r
+

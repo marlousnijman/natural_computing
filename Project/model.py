@@ -32,7 +32,7 @@ def DQN(input_shape=(84, 84, 4), n_actions=4):
 
     return model
 
-def mnih_DQN(input_shape=(84, 84, 4), n_actions=4):
+def rodrigues_DQN(input_shape=(84, 84, 4), n_actions=4):
     model = models.Sequential()
 
     # Convolutional layers
@@ -49,8 +49,30 @@ def mnih_DQN(input_shape=(84, 84, 4), n_actions=4):
     # Output layer
     model.add(layers.Dense(400)) 
     model.add(layers.Activation('relu'))
-    
+
     model.add(layers.Dense(n_actions)) 
     model.add(layers.Activation('relu'))
+
+    return model
+
+def mnih_DQN(input_shape=(84, 84, 4), n_actions=4):
+    model = models.Sequential()
+
+    # Convolutional layers
+    model.add(layers.Conv2D(32, (8, 8), strides=4, input_shape=input_shape))
+    model.add(layers.Activation('relu'))
+
+    model.add(layers.Conv2D(64, (4, 4), strides=2))
+    model.add(layers.Activation('relu'))
+
+    model.add(layers.Conv2D(64, (3, 3), strides=1))
+    model.add(layers.Activation('relu'))
+
+    model.add(layers.Flatten())
+
+    # Output layer
+    model.add(layers.Dense(512)) 
+    model.add(layers.Activation('relu'))
+    model.add(layers.Dense(n_actions)) 
 
     return model
