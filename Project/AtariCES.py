@@ -198,7 +198,6 @@ class AtariCES():
             real_sigma = np.geomspace(sigma[0],sigma[1],iterations)[i]
 
         elif adaptive_type == 'exp':
-            print(np.sum(sigma))
             real_sigma = np.flip(np.sum(sigma) - np.geomspace(sigma[0], sigma[1], iterations))[i]
 
         else:
@@ -212,7 +211,6 @@ class AtariCES():
         showing the best and worst reward.
         """
         x = np.arange(1,len(best_r)+1)
-        print(len(x))
         plt.figure()
         plt.plot(x, mean_r)
         plt.fill_between(x, worst_r, best_r, color="#C4E1F5")
@@ -238,7 +236,7 @@ class AtariCES():
             r = np.zeros((self.n_offspring))
             
             sigma_step = self.get_sigma(self.sigma,t,self.iterations,self.adaptive_type)
-            print(sigma_step)
+
             for i in tqdm(range(self.n_offspring)):
                 e[i] = np.random.normal(0, sigma_step**2, size=theta.shape)
                 new_model = self.set_model_weights(theta, sigma_step, e[i])
