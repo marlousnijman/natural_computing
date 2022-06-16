@@ -18,8 +18,8 @@ class AtariCES():
         Initialize the Atari Canonical Evolutionary
         Strategy class.
         """
-        self.model = rodrigues_DQN()
-    
+        # self.model = rodrigues_DQN()
+
         # Game parameters
         self.game = game
         self.render = render
@@ -141,7 +141,7 @@ class AtariCES():
         Set the model weights based on theta and
         possibly random noise.
         """
-        model = rodrigues_DQN(n_actions=self.n_actions) 
+        model = self.model
         parameters = model.trainable_weights
         start_idx = 0
         w = theta + sigma * e
