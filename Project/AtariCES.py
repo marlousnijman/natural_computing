@@ -129,7 +129,7 @@ class AtariCES():
 
             return W
 
-        elif (method == "random") or (method == "tournament"): 
+        elif (method == "random") or (method == "roulette"): 
             W = [1 / self.n_parents] * self.n_parents
             return W
 
@@ -166,7 +166,7 @@ class AtariCES():
         """ 
         Select parents according to the method of choice.
         Can be selecting the top n best parents, random parents,
-        or tournament selection. 
+        or roulette wheel selection. 
         """
         if method == "topn":
             sorted_rewards = rewards.argsort()[::-1]
@@ -177,8 +177,12 @@ class AtariCES():
         elif method == "random":
             return random.choices(e, k=self.n_parents)
 
-        elif method == "tournament": 
-            weights = rewards / np.sum(rewards)
+        elif method == "roulette": 
+            if np.sum(rewards) != 0:
+                weights = rewards / np.sum(rewards)
+            else:
+                weights = [1] * self.n_parents
+
             return random.choices(e, weights=weights, k=self.n_parents)
 
         else:
