@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow.keras import layers, models
 
 
-def DQN(input_shape=(84, 84, 4), n_actions=4):
+def DQN_Chrabaszcz_model(input_shape=(84, 84, 4), n_actions=4):
     model = models.Sequential()
 
     # Convolutional layers
@@ -32,7 +32,7 @@ def DQN(input_shape=(84, 84, 4), n_actions=4):
 
     return model
 
-def rodrigues_DQN(input_shape=(84, 84, 4), n_actions=4):
+def DQN_Rodrigues_model(input_shape=(84, 84, 4), n_actions=4):
     model = models.Sequential()
 
     # Convolutional layers
@@ -55,7 +55,7 @@ def rodrigues_DQN(input_shape=(84, 84, 4), n_actions=4):
 
     return model
 
-def mnih_DQN(input_shape=(84, 84, 4), n_actions=4):
+def DQN_Mnih_model(input_shape=(84, 84, 4), n_actions=4):
     model = models.Sequential()
 
     # Convolutional layers

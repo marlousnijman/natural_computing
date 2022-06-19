@@ -4,9 +4,7 @@ from gym.wrappers import AtariPreprocessing, FrameStack
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import random
-
-from model import DQN, mnih_DQN, rodrigues_DQN
-
+from model import DQN_Chrabaszcz_model, DQN_Rodrigues_model, DQN_Mnih_model
 
 class AtariCES():
     def __init__(self, game, render,
@@ -18,7 +16,6 @@ class AtariCES():
         Initialize the Atari Canonical Evolutionary
         Strategy class.
         """
-        # self.model = rodrigues_DQN()
 
         # Game parameters
         self.game = game
@@ -76,7 +73,7 @@ class AtariCES():
 
     def episode(self, model, max_step, render=False):
         """
-        Perform an episode of a maximum number of stepss 
+        Perform an episode of a maximum number of steps
         for the specified game and return the reward. 
         """
         if render:
@@ -96,11 +93,14 @@ class AtariCES():
                 env.render(mode="rgb_array")
             step += 1
 
+
+
             action = np.argmax(model(frames).numpy()) 
             frames, reward, done, info = env.step(action)
             frames = self.get_frames(frames)
 
             episode_reward += reward
+
             if done:
                 frames = self.get_frames(env.reset())
 
@@ -136,13 +136,14 @@ class AtariCES():
         else:
             print("Invalid parent selection method")
 
-    def set_model_weights(self, theta, sigma, e):
+    def set_model_weights(self, model, theta, sigma, e):
         """
         Set the model weights based on theta and
         possibly random noise.
         """
-        model = self.model
-        parameters = model.trainable_weights
+
+        current_model = model
+        parameters = current_model.trainable_weights
         start_idx = 0
         w = theta + sigma * e
 
@@ -151,14 +152,14 @@ class AtariCES():
             p.assign(w[start_idx:(start_idx + n)].reshape(p.shape))
             start_idx += n
 
-        return model
+        return current_model
 
-    def show_last(self, theta, max_step):
+    def show_last(self, theta, model, max_step):
         """
         Show performance after the final generation.
         """
-        model = self.set_model_weights(theta, 0, 0)
-        self.episode(model, max_step, render=True)
+        new_model = self.set_model_weights(model, theta, 0, 0)
+        self.episode(new_model, max_step, render=True)
 
         print("Finished")
 
@@ -220,32 +221,56 @@ class AtariCES():
         plt.savefig(f"rewards_{self.game}_{self.adaptive_type}.png")
         plt.show()
 
-    def CES(self):
+    def ensemble_CES(self):
         """
-        Perform the Canonical Evolutionary Strategy on the
-        predefined Atari game.
+        Perform the Canonical Evolutionary Strategy with different DQN models using ensemble 
+        learning on the predefined Atari game
         """
-        theta = self.get_start_parameters(self.model)
+        chrabaszcz_model = DQN_Chrabaszcz_model(n_actions=self.n_actions) 
+        rodrigues_model = DQN_Rodrigues_model(n_actions=self.n_actions) 
+        mnih_model = DQN_Mnih_model(n_actions=self.n_actions) 
+        
+        chrabaszcz_theta = self.get_start_parameters(chrabaszcz_model)
+        rodrigues_theta = self.get_start_parameters(rodrigues_model)
+        mnih_theta = self.get_start_parameters(mnih_model)
+
         W = self.get_weights(method=self.parent_selection)
+
         best_r = np.zeros((self.iterations))
         worst_r = np.zeros((self.iterations))
         mean_r = np.zeros((self.iterations))
 
         for t in range(self.iterations):
             print('Iteration: ', t + 1)
-            e = np.zeros((self.n_offspring, theta.shape[0]))
+
+            chrabaszcz_e = np.zeros((self.n_offspring, chrabaszcz_theta.shape[0]))
+            rodrigues_e = np.zeros((self.n_offspring, rodrigues_theta.shape[0]))
+            mnih_e = np.zeros((self.n_offspring, mnih_theta.shape[0]))
+
             r = np.zeros((self.n_offspring))
-            
-            sigma_step = self.get_sigma(self.sigma,t,self.iterations,self.adaptive_type)
+            sigma_step = self.get_sigma(self.sigma, t, self.iterations, self.adaptive_type)
             
             for i in tqdm(range(self.n_offspring)):
-                e[i] = np.random.normal(0, sigma_step**2, size=theta.shape)
-                new_model = self.set_model_weights(theta, sigma_step, e[i])
+                chrabaszcz_e[i] = np.random.normal(0, sigma_step**2, size=chrabaszcz_theta.shape)
+                rodrigues_e[i] = np.random.normal(0, sigma_step**2, size=rodrigues_theta.shape)
+                mnih_e[i] = np.random.normal(0, sigma_step**2, size=mnih_theta.shape)
+
+                new_chrabaszcz_model = self.set_model_weights(chrabaszcz_model, chrabaszcz_theta, sigma_step, chrabaszcz_e[i])
+                new_rodrigues_model = self.set_model_weights(rodrigues_model, rodrigues_theta, sigma_step, rodrigues_e[i])
+                new_mnih_model = self.set_model_weights(mnih_model, mnih_theta, sigma_step, mnih_e[i])
 
                 if self.render:
-                    r[i] = self.episode(new_model, self.max_step, render=True)
+                    chrabaszcz_r = self.episode(new_chrabaszcz_model, self.max_step, render=True)
+                    rodrigues_r = self.episode(new_rodrigues_model, self.max_step, render=True)
+                    mnih_r = self.episode(new_mnih_model, self.max_step, render=True)
+
+                    r[i] = np.max([chrabaszcz_r, rodrigues_r, mnih_r])
                 else:
-                    r[i] = self.episode(new_model, self.max_step)
+                    chrabaszcz_r = self.episode(new_chrabaszcz_model, self.max_step)
+                    rodrigues_r = self.episode(new_rodrigues_model, self.max_step)
+                    mnih_r = self.episode(new_mnih_model, self.max_step)
+
+                    r[i] = np.max([chrabaszcz_r, rodrigues_r, mnih_r])
 
             best_r[t] = np.max(r)
             worst_r[t] = np.min(r)
@@ -253,10 +278,34 @@ class AtariCES():
 
             print(f"best reward: {best_r[t]}")
 
-            best_es = self.select_parents(e, r, method=self.parent_selection)
-            theta += sigma_step * np.sum([W[i] * best_es[i] for i in range(len(W))], axis=0)
+            chrabaszcz_best_es = self.select_parents(chrabaszcz_e, r, method=self.parent_selection)
+            chrabaszcz_theta += sigma_step * np.sum([W[i] * chrabaszcz_best_es[i] for i in range(len(W))], axis=0)
+
+            rodrigues_best_es = self.select_parents(rodrigues_e, r, method=self.parent_selection)
+            rodrigues_theta += sigma_step * np.sum([W[i] * rodrigues_best_es[i] for i in range(len(W))], axis=0)
+
+            mnih_best_es = self.select_parents(mnih_e, r, method=self.parent_selection)
+            mnih_theta += sigma_step * np.sum([W[i] * mnih_best_es[i] for i in range(len(W))], axis=0)
 
         self.plot_rewards(best_r, worst_r, mean_r)
+        
+        theta_list = [chrabaszcz_theta, rodrigues_theta, mnih_theta]
+        model_list = [chrabaszcz_model, rodrigues_model, mnih_model]
 
-        return theta, best_r
+        return theta_list, model_list, best_r
+
+
+
+            
+
+
+
+            
+
+
+
+
+
+
+
 
